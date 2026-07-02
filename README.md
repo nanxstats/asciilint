@@ -16,14 +16,24 @@ allowlists and denylists, so it is useful for broader character policy checks.
 
 ## Installation
 
+Install `asciilint` from PyPI:
+
 ```bash
 pip install asciilint
 ```
 
-With `uv`:
+For an isolated, global CLI installation, use
+[`pipx`](https://packaging.python.org/en/latest/guides/installing-stand-alone-command-line-tools/):
 
 ```bash
-uv add asciilint
+pipx install asciilint
+```
+
+To run it once without adding it to your environment, use
+[`uvx`](https://docs.astral.sh/uv/guides/tools/):
+
+```bash
+uvx asciilint --help
 ```
 
 ## Usage
