@@ -13,7 +13,8 @@ def test_cli_passes_ascii_project(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "No issues :-)" in result.output
-    assert "Checking text: ✓" in result.output
+    assert "Checking text:\n✓\n" in result.output
+    assert "Files checked: 1 text, 0 binary skipped, 0 read error(s)" in result.output
 
 
 def test_cli_fails_on_non_ascii_by_default(tmp_path: Path) -> None:
@@ -40,6 +41,19 @@ def test_cli_respects_gitignore(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "1 ignored" in result.output
+    assert "No issues :-)" in result.output
+
+
+def test_cli_wraps_progress_statuses_for_ci_logs(tmp_path: Path) -> None:
+    for index in range(82):
+        (tmp_path / f"ok-{index:03}.txt").write_text("ok\n", encoding="utf-8")
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["--no-config", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Checking text:\n" + ("\u2713" * 80) + "\n" in result.output
+    assert ("\u2713" * 80) + "\n" + ("\u2713" * 2) + "\n" in result.output
     assert "No issues :-)" in result.output
 
 

@@ -1,7 +1,13 @@
 from pathlib import Path
 
 from asciilint.policy import CharacterPolicy
-from asciilint.scanner import discover_files, is_text_file, scan_text_file
+from asciilint.scanner import (
+    Discovery,
+    discover_files,
+    is_text_file,
+    scan,
+    scan_text_file,
+)
 
 
 def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
@@ -55,3 +61,37 @@ def test_scan_text_file_reports_utf8_errors(tmp_path: Path) -> None:
     assert finding is None
     assert error is not None
     assert "not valid UTF-8" in error.message
+
+
+def test_scan_emits_progress_callbacks(tmp_path: Path) -> None:
+    (tmp_path / "bad.txt").write_text("é\n", encoding="utf-8")
+    (tmp_path / "ok.txt").write_text("ok\n", encoding="utf-8")
+    policy = CharacterPolicy.from_config(
+        allowed_chars=(),
+        allowed_ranges=("U+0000-U+007F",),
+        disallowed_chars=(),
+        disallowed_ranges=(),
+    )
+    discovered: list[tuple[int, int]] = []
+    statuses: list[tuple[str, str]] = []
+
+    def on_discovery(discovery: Discovery) -> None:
+        discovered.append((discovery.candidates_count, len(discovery.files)))
+
+    def on_status(status: str, path: Path) -> None:
+        statuses.append((status, path.name))
+
+    result = scan(
+        (tmp_path,),
+        base_dir=tmp_path,
+        respect_gitignore=True,
+        ignore_files=(),
+        policy=policy,
+        max_issues_per_file=5,
+        on_discovery=on_discovery,
+        on_status=on_status,
+    )
+
+    assert discovered == [(2, 2)]
+    assert statuses == [("x", "bad.txt"), ("\u2713", "ok.txt")]
+    assert result.statuses == ("x", "\u2713")
