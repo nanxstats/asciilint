@@ -17,7 +17,9 @@ nav = [
         "articles/configuration.md",
     ] },
     { "API reference" = [
-        "reference/index.md",
+        { "Config" = "reference/config.md" },
+        { "Policy" = "reference/policy.md" },
+        { "Scanner" = "reference/scanner.md" },
     ] },
     { "Changelog" = "changelog.md" },
 ]
