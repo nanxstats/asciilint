@@ -22,10 +22,15 @@ A passing run is intentionally quiet:
 
 ```text
 > Checking characters in /path/to/project
-Files found: 8, 6 text, 1 binary skipped, 1 ignored
-Checking text: ✓✓✓✓✓✓
+Files found: 8, 7 to scan, 1 ignored
+Checking text:
+✓✓✓✓✓✓
+Files checked: 6 text, 1 binary skipped, 0 read error(s)
 No issues :-)
 ```
+
+Status characters are written while files are scanned, and long status lines are
+wrapped so CI logs keep receiving progress.
 
 A failing run points to the file, line, column, code point, and reason:
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## asciilint 0.2.0
+
+## Improvements
+
+- Added progressive CLI output that prints scan setup, discovery counts, and
+  per-file status marks while scanning instead of waiting for the full scan to
+  finish (#5).
+- Wrapped long status mark output at a fixed width with marks starting on their
+  own lines, to keep large-project and GitHub Actions logs responsive and
+  readable (#5).
+- Added scanner progress callbacks so the CLI can stream progress while
+  preserving the existing complete scan result for final reporting (#5).
+
 ## asciilint 0.1.0
 
 ### New features
