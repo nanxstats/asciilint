@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,6 +33,10 @@ class Discovery:
     candidates_count: int
     ignored_count: int
     ignore_sources: tuple[IgnoreSource, ...]
+
+
+DiscoveryCallback = Callable[[Discovery], None]
+StatusCallback = Callable[[str, Path], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +144,8 @@ def scan(
     ignore_files: tuple[Path, ...],
     policy: CharacterPolicy,
     max_issues_per_file: int,
+    on_discovery: DiscoveryCallback | None = None,
+    on_status: StatusCallback | None = None,
 ) -> ScanResult:
     """Discover and scan text files."""
 
@@ -149,12 +155,19 @@ def scan(
         respect_gitignore=respect_gitignore,
         ignore_files=ignore_files,
     )
+    if on_discovery is not None:
+        on_discovery(discovery)
 
     findings: list[FileFinding] = []
     errors: list[FileError] = []
     statuses: list[str] = []
     text_count = 0
     binary_count = 0
+
+    def record_status(status: str, path: Path) -> None:
+        statuses.append(status)
+        if on_status is not None:
+            on_status(status, path)
 
     for path in discovery.files:
         try:
@@ -163,7 +176,7 @@ def scan(
                 continue
         except OSError as exc:
             errors.append(FileError(path=path, message=str(exc)))
-            statuses.append("?")
+            record_status("?", path)
             continue
 
         text_count += 1
@@ -172,12 +185,12 @@ def scan(
         )
         if error is not None:
             errors.append(error)
-            statuses.append("?")
+            record_status("?", path)
         elif finding is not None:
             findings.append(finding)
-            statuses.append("x")
+            record_status("x", path)
         else:
-            statuses.append("\u2713")
+            record_status("\u2713", path)
 
     return ScanResult(
         base_dir=base_dir,

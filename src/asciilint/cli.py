@@ -10,7 +10,7 @@ import click
 
 from asciilint import __version__
 from asciilint.config import Config, ConfigError, find_config
-from asciilint.output import format_report
+from asciilint.output import ProgressReporter, format_report, format_scan_totals
 from asciilint.policy import CharacterPolicy, PolicyError
 from asciilint.scanner import scan
 
@@ -116,6 +116,8 @@ def main(
         raise click.ClickException(str(exc)) from exc
 
     base_dir = _scan_base_dir(config.paths)
+    progress = ProgressReporter(_write_progress)
+    progress.start(base_dir)
     result = scan(
         config.paths,
         base_dir=base_dir,
@@ -123,8 +125,14 @@ def main(
         ignore_files=config.ignore_files,
         policy=policy,
         max_issues_per_file=config.max_issues_per_file,
+        on_discovery=progress.discovery,
+        on_status=lambda status, _path: progress.status(status),
     )
-    click.echo(format_report(result))
+    progress.finish()
+    click.echo(format_scan_totals(result))
+    if result.has_issues:
+        click.echo()
+    click.echo(format_report(result, include_scan_details=False))
     if result.has_issues:
         raise click.exceptions.Exit(1)
 
@@ -188,3 +196,7 @@ def _scan_base_dir(paths: tuple[Path, ...]) -> Path:
     if len(resolved_dirs) == 1:
         return resolved_dirs[0]
     return Path(os.path.commonpath([str(path) for path in resolved_dirs])).resolve()
+
+
+def _write_progress(text: str) -> None:
+    click.echo(text, nl=False)
