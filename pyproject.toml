@@ -11,8 +11,9 @@ classifiers = [
 
     "Intended Audience :: Developers",
 
-    "Topic :: Software Development :: Testing",
-    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Text Processing",
+    "Topic :: Utilities",
 
     "Operating System :: OS Independent",
 
@@ -26,6 +27,9 @@ classifiers = [
 ]
 
 requires-python = ">=3.11"
+
+[project.scripts]
+asciilint = "asciilint.cli:main"
 
 [project.urls]
 Homepage = "https://nanx.me/asciilint/"
@@ -79,3 +83,6 @@ skip = ["vendor", ".venv"]
 
 [tool.mypy]
 exclude = ["vendor/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

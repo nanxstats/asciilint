@@ -1,0 +1,57 @@
+from pathlib import Path
+
+from asciilint.policy import CharacterPolicy
+from asciilint.scanner import discover_files, is_text_file, scan_text_file
+
+
+def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
+    text = tmp_path / "text.txt"
+    text.write_text("hello π\n", encoding="utf-8")
+    binary = tmp_path / "image.bin"
+    binary.write_bytes(b"hello\x00world")
+    empty = tmp_path / "empty.txt"
+    empty.write_bytes(b"")
+
+    assert is_text_file(text)
+    assert not is_text_file(binary)
+    assert not is_text_file(empty)
+
+
+def test_discover_files_batches_gitignore_and_custom_ignore(tmp_path: Path) -> None:
+    (tmp_path / ".gitignore").write_text("ignored-by-git/\n", encoding="utf-8")
+    (tmp_path / "custom.ignore").write_text("ignored-by-custom.txt\n", encoding="utf-8")
+    (tmp_path / "ignored-by-git").mkdir()
+    (tmp_path / "ignored-by-git" / "bad.txt").write_text("é", encoding="utf-8")
+    (tmp_path / "ignored-by-custom.txt").write_text("é", encoding="utf-8")
+    (tmp_path / "kept.txt").write_text("ok", encoding="utf-8")
+
+    discovery = discover_files(
+        (tmp_path,),
+        base_dir=tmp_path,
+        respect_gitignore=True,
+        ignore_files=(Path("custom.ignore"),),
+    )
+
+    assert {path.name for path in discovery.files} == {
+        ".gitignore",
+        "custom.ignore",
+        "kept.txt",
+    }
+    assert discovery.ignored_count == 2
+
+
+def test_scan_text_file_reports_utf8_errors(tmp_path: Path) -> None:
+    path = tmp_path / "latin1.txt"
+    path.write_bytes(b"caf\xe9\n")
+    policy = CharacterPolicy.from_config(
+        allowed_chars=(),
+        allowed_ranges=("U+0000-U+007F",),
+        disallowed_chars=(),
+        disallowed_ranges=(),
+    )
+
+    finding, error = scan_text_file(path, policy=policy, max_issues_per_file=5)
+
+    assert finding is None
+    assert error is not None
+    assert "not valid UTF-8" in error.message
