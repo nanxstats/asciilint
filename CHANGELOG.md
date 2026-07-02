@@ -2,7 +2,7 @@
 
 ## asciilint 0.2.0
 
-## Improvements
+### Improvements
 
 - Added progressive CLI output that prints scan setup, discovery counts, and
   per-file status marks while scanning instead of waiting for the full scan to
