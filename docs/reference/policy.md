@@ -1,0 +1,3 @@
+# Policy
+
+::: asciilint.policy
