@@ -1,6 +1,6 @@
 [project]
 name = "asciilint"
-version = "0.1.0"
+version = "0.2.0"
 description = "ASCII and character policy checks for text files"
 authors = [{ name = "Nan Xiao", email = "me@nanx.me" }]
 readme = "README.md"
