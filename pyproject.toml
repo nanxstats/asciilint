@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "ASCII and character policy checks for text files"
 authors = [{ name = "Nan Xiao", email = "me@nanx.me" }]
 readme = "README.md"
-dependencies = ["click>=8.4.2", "pathspec>=1.1.1"]
+dependencies = ["click>=8.3.0", "pathspec>=1.0.0"]
 
 classifiers = [
     "Development Status :: 3 - Alpha",
