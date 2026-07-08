@@ -1,5 +1,13 @@
 # Changelog
 
+## asciilint 0.2.1
+
+### Dependencies
+
+- Lower the minimum required version of `click` to 8.3.0 and
+  `pathspec` to 1.0.0 to allow for more flexible dependency resolution
+  in downstream projects (#9).
+
 ## asciilint 0.2.0
 
 ### Improvements
