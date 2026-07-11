@@ -44,6 +44,42 @@ def test_cli_respects_gitignore(tmp_path: Path) -> None:
     assert "No issues :-)" in result.output
 
 
+def test_cli_no_gitignore_scans_gitignored_directory(tmp_path: Path) -> None:
+    (tmp_path / ".gitignore").write_text("ignored/\n", encoding="utf-8")
+    (tmp_path / "ignored").mkdir()
+    (tmp_path / "ignored" / "bad.txt").write_text("é\n", encoding="utf-8")
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["--no-config", "--no-gitignore", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "ignored/bad.txt" in result.output
+
+
+def test_cli_prunes_directory_from_additional_ignore_file(tmp_path: Path) -> None:
+    ignore_file = tmp_path / "custom.ignore"
+    ignore_file.write_text("generated/\n", encoding="utf-8")
+    (tmp_path / "generated").mkdir()
+    (tmp_path / "generated" / "bad.txt").write_text("é\n", encoding="utf-8")
+    (tmp_path / "ok.txt").write_text("ok\n", encoding="utf-8")
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        [
+            "--no-config",
+            "--no-gitignore",
+            "--ignore-file",
+            str(ignore_file),
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "1 ignored" in result.output
+    assert "No issues :-)" in result.output
+
+
 def test_cli_wraps_progress_statuses_for_ci_logs(tmp_path: Path) -> None:
     for index in range(82):
         (tmp_path / f"ok-{index:03}.txt").write_text("ok\n", encoding="utf-8")
