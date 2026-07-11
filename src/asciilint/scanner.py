@@ -27,7 +27,11 @@ class IgnoreSource:
 
 @dataclass(frozen=True, slots=True)
 class Discovery:
-    """File discovery result."""
+    """File discovery result.
+
+    ``candidates_count`` counts file entries only. ``ignored_count`` counts
+    ignored file entries and each pruned directory once.
+    """
 
     files: tuple[Path, ...]
     candidates_count: int
@@ -41,6 +45,7 @@ class _DiscoveryEntry:
 
     path: Path
     ignored: bool
+    is_directory: bool
 
 
 DiscoveryCallback = Callable[[Discovery], None]
@@ -137,10 +142,11 @@ def discover_files(
         _dedupe_entries(_iter_discovery_entries(paths, ignore_sources=ignore_sources))
     )
     files = tuple(entry.path for entry in entries if not entry.ignored)
+    candidates_count = sum(not entry.is_directory for entry in entries)
     ignored_count = sum(entry.ignored for entry in entries)
     return Discovery(
         files=files,
-        candidates_count=len(entries),
+        candidates_count=candidates_count,
         ignored_count=ignored_count,
         ignore_sources=ignore_sources,
     )
@@ -269,13 +275,14 @@ def _iter_discovery_entries(
         path = raw_path.resolve()
         if path.is_dir():
             if _is_ignored(path, ignore_sources, is_dir=True):
-                yield _DiscoveryEntry(path=path, ignored=True)
+                yield _DiscoveryEntry(path=path, ignored=True, is_directory=True)
             else:
                 yield from _walk_entries(path, ignore_sources=ignore_sources)
         elif path.is_file():
             yield _DiscoveryEntry(
                 path=path,
                 ignored=_is_ignored(path, ignore_sources, is_dir=False),
+                is_directory=False,
             )
 
 
@@ -288,7 +295,7 @@ def _walk_entries(
         for dirname in sorted(dirnames):
             path = current_dir / dirname
             if _is_ignored(path, ignore_sources, is_dir=True):
-                yield _DiscoveryEntry(path=path, ignored=True)
+                yield _DiscoveryEntry(path=path, ignored=True, is_directory=True)
             elif not path.is_symlink():
                 kept_dirnames.append(dirname)
         dirnames[:] = kept_dirnames
@@ -296,10 +303,12 @@ def _walk_entries(
         for filename in sorted(filenames):
             path = current_dir / filename
             if _is_ignored(path, ignore_sources, is_dir=False):
-                yield _DiscoveryEntry(path=path, ignored=True)
+                yield _DiscoveryEntry(path=path, ignored=True, is_directory=False)
                 continue
             if path.is_file():
-                yield _DiscoveryEntry(path=path.resolve(), ignored=False)
+                yield _DiscoveryEntry(
+                    path=path.resolve(), ignored=False, is_directory=False
+                )
 
 
 def _dedupe_entries(entries: Iterable[_DiscoveryEntry]) -> Iterable[_DiscoveryEntry]:

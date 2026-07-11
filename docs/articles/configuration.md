@@ -34,8 +34,9 @@ enumerated.
 Negated directory patterns are applied before that decision, so a
 rule such as `!generated/keep/` can keep a matching subtree in the scan.
 
-The discovery summary counts a pruned directory as one ignored entry.
-It does not count files beneath that directory because they are intentionally
+The discovery summary's "Files found" value counts file candidates only.
+Each pruned directory contributes one ignored entry, but not one file candidate.
+It does not count files under that directory because they are intentionally
 never queried.
 
 ## Character policy
@@ -68,7 +69,7 @@ disallowed_chars = ["é"]
 Allow any Unicode character except selected punctuation:
 
 ```bash
-asciilint . --allow-any --disallowed-char "→" --disallowed-range U+2000-U+206F
+asciilint . --allow-any --disallowed-char "&rarr;" --disallowed-range U+2000-U+206F
 ```
 
 ## UTF-8 only

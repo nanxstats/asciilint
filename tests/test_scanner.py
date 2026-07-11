@@ -29,7 +29,9 @@ def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
 def test_discover_files_prunes_gitignore_and_custom_ignore_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / ".gitignore").write_text("ignored-by-git/\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(
+        "ignored-by-git/\nignored-file.txt\n", encoding="utf-8"
+    )
     (tmp_path / "custom.ignore").write_text("ignored-by-custom/\n", encoding="utf-8")
     ignored_directories = {
         tmp_path / "ignored-by-git",
@@ -39,6 +41,7 @@ def test_discover_files_prunes_gitignore_and_custom_ignore_directories(
         directory.mkdir()
         (directory / "nested").mkdir()
         (directory / "nested" / "bad.txt").write_text("é", encoding="utf-8")
+    (tmp_path / "ignored-file.txt").write_text("é", encoding="utf-8")
     (tmp_path / "kept.txt").write_text("ok", encoding="utf-8")
 
     real_scandir = os.scandir
@@ -61,7 +64,8 @@ def test_discover_files_prunes_gitignore_and_custom_ignore_directories(
         "custom.ignore",
         "kept.txt",
     }
-    assert discovery.ignored_count == 2
+    assert discovery.candidates_count == 4
+    assert discovery.ignored_count == 3
 
 
 def test_discover_files_respects_negated_directory_pattern(
@@ -96,6 +100,7 @@ def test_discover_files_respects_negated_directory_pattern(
         ".gitignore",
         "generated/keep/good.txt",
     }
+    assert discovery.candidates_count == 2
     assert discovery.ignored_count == 1
 
 
