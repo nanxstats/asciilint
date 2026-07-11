@@ -1,5 +1,17 @@
 # Changelog
 
+## asciilint 0.3.0
+
+### Improvements
+
+- Refactored file discovery logic to load ignore rules before walking the
+  filesystem and prune matching directories from `os.walk`.
+  Previously, `asciilint` enumerated every file before applying ignore rules,
+  which caused noticeable startup lag in projects containing large ignored
+  trees such as `.venv/` and `node_modules/`.
+  Their contents are now never queried, while configured ignore files,
+  negated directory rules, and `--no-gitignore` behavior remain supported.
+
 ## asciilint 0.2.1
 
 ### Dependencies
