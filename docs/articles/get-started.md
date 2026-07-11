@@ -22,7 +22,7 @@ A passing run is intentionally quiet:
 
 ```text
 > Checking characters in /path/to/project
-Files found: 8, 7 to scan, 1 ignored
+Files to scan: 7, 1 ignored
 Checking text:
 ✓✓✓✓✓✓
 Files checked: 6 text, 1 binary skipped, 0 read error(s)

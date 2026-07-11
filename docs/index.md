@@ -46,7 +46,7 @@ Example failing output:
 
 ```text
 > Checking characters in /path/to/project
-Files found: 3, 2 to scan, 1 ignored
+Files to scan: 2, 1 ignored
 Checking text:
 ✓x
 Files checked: 2 text, 0 binary skipped, 0 read error(s)
