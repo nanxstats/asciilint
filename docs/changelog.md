@@ -5,7 +5,8 @@
 ### Improvements
 
 - Refactored file discovery logic to load ignore rules before walking the
-  filesystem and prune matching directories from `os.walk`.
+  filesystem and prune matching directories from `os.walk` (#12).
+
   Previously, `asciilint` enumerated every file before applying ignore rules,
   which caused noticeable startup lag in projects containing large ignored
   trees such as `.venv/` and `node_modules/`.
