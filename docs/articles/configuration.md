@@ -25,9 +25,18 @@ in TOML or passed on the command line:
 asciilint . --ignore-file .asciilintignore --ignore-file tools/asciilint.ignore
 ```
 
-Every ignore file must use gitignore syntax. Matching is handled by `pathspec`;
-`asciilint` applies loaded specs to discovered file paths in batches instead of
-checking each path against each pattern one by one.
+Every ignore file must use gitignore syntax. Matching is handled by `pathspec`.
+
+Directory entries are matched before `asciilint` descends into them, so the
+contents of ignored trees such as `.venv/` and `node_modules/` are never
+enumerated.
+
+Negated directory patterns are applied before that decision, so a
+rule such as `!generated/keep/` can keep a matching subtree in the scan.
+
+The discovery summary counts a pruned directory as one ignored entry.
+It does not count files beneath that directory because they are intentionally
+never queried.
 
 ## Character policy
 
