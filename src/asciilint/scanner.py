@@ -35,6 +35,14 @@ class Discovery:
     ignore_sources: tuple[IgnoreSource, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _DiscoveryEntry:
+    """One file or pruned directory found during traversal."""
+
+    path: Path
+    ignored: bool
+
+
 DiscoveryCallback = Callable[[Discovery], None]
 StatusCallback = Callable[[str, Path], None]
 
@@ -118,20 +126,22 @@ def discover_files(
     respect_gitignore: bool,
     ignore_files: tuple[Path, ...],
 ) -> Discovery:
-    """Discover files and apply gitignore-style filters in batches."""
+    """Discover files while pruning gitignore-style directory matches."""
 
-    candidate_files = tuple(_dedupe(_iter_candidate_files(paths)))
     ignore_sources = _load_ignore_sources(
         base_dir=base_dir,
         respect_gitignore=respect_gitignore,
         ignore_files=ignore_files,
     )
-    ignored = _match_ignored(candidate_files, ignore_sources, base_dir=base_dir)
-    files = tuple(path for path in candidate_files if path not in ignored)
+    entries = tuple(
+        _dedupe_entries(_iter_discovery_entries(paths, ignore_sources=ignore_sources))
+    )
+    files = tuple(entry.path for entry in entries if not entry.ignored)
+    ignored_count = sum(entry.ignored for entry in entries)
     return Discovery(
         files=files,
-        candidates_count=len(candidate_files),
-        ignored_count=len(ignored),
+        candidates_count=len(entries),
+        ignored_count=ignored_count,
         ignore_sources=ignore_sources,
     )
 
@@ -252,35 +262,53 @@ def relpath(path: Path, base_dir: Path) -> str:
         return os.path.relpath(path, base_dir).replace(os.sep, "/")
 
 
-def _iter_candidate_files(paths: Iterable[Path]) -> Iterable[Path]:
+def _iter_discovery_entries(
+    paths: Iterable[Path], *, ignore_sources: tuple[IgnoreSource, ...]
+) -> Iterable[_DiscoveryEntry]:
     for raw_path in paths:
         path = raw_path.resolve()
         if path.is_dir():
-            yield from _walk_files(path)
+            if _is_ignored(path, ignore_sources, is_dir=True):
+                yield _DiscoveryEntry(path=path, ignored=True)
+            else:
+                yield from _walk_entries(path, ignore_sources=ignore_sources)
         elif path.is_file():
-            yield path
+            yield _DiscoveryEntry(
+                path=path,
+                ignored=_is_ignored(path, ignore_sources, is_dir=False),
+            )
 
 
-def _walk_files(root: Path) -> Iterable[Path]:
+def _walk_entries(
+    root: Path, *, ignore_sources: tuple[IgnoreSource, ...]
+) -> Iterable[_DiscoveryEntry]:
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        dirnames[:] = sorted(
-            dirname
-            for dirname in dirnames
-            if not (Path(dirpath) / dirname).is_symlink()
-        )
+        current_dir = Path(dirpath)
+        kept_dirnames: list[str] = []
+        for dirname in sorted(dirnames):
+            path = current_dir / dirname
+            if _is_ignored(path, ignore_sources, is_dir=True):
+                yield _DiscoveryEntry(path=path, ignored=True)
+            elif not path.is_symlink():
+                kept_dirnames.append(dirname)
+        dirnames[:] = kept_dirnames
+
         for filename in sorted(filenames):
-            path = Path(dirpath) / filename
+            path = current_dir / filename
+            if _is_ignored(path, ignore_sources, is_dir=False):
+                yield _DiscoveryEntry(path=path, ignored=True)
+                continue
             if path.is_file():
-                yield path.resolve()
+                yield _DiscoveryEntry(path=path.resolve(), ignored=False)
 
 
-def _dedupe(paths: Iterable[Path]) -> Iterable[Path]:
+def _dedupe_entries(entries: Iterable[_DiscoveryEntry]) -> Iterable[_DiscoveryEntry]:
     seen: set[Path] = set()
-    for path in paths:
-        if path in seen:
+    for entry in entries:
+        if entry.path in seen:
             continue
-        seen.add(path)
-        yield path
+        seen.add(entry.path)
+        yield entry
 
 
 def _load_ignore_sources(
@@ -318,26 +346,24 @@ def _load_ignore_sources(
     return tuple(sources)
 
 
-def _match_ignored(
-    files: tuple[Path, ...], ignore_sources: tuple[IgnoreSource, ...], *, base_dir: Path
-) -> frozenset[Path]:
-    ignored: set[Path] = set()
-    base_dir = base_dir.resolve()
-
+def _is_ignored(
+    path: Path, ignore_sources: tuple[IgnoreSource, ...], *, is_dir: bool
+) -> bool:
     for source in ignore_sources:
-        rel_to_path: dict[str, Path] = {}
-        for path in files:
-            try:
-                rel = path.resolve().relative_to(source.base_dir)
-            except ValueError:
-                continue
-            rel_to_path[rel.as_posix()] = path
+        # An ignore file does not exclude itself through its own patterns.
+        if path == source.path:
+            continue
+        try:
+            relative = path.relative_to(source.base_dir)
+        except ValueError:
+            continue
+        if relative == Path("."):
+            continue
 
-        for matched in source.spec.match_files(rel_to_path):
-            path = rel_to_path[matched]
-            # Never ignore explicitly provided ignore files outside normal trees.
-            if path == source.path or path == base_dir / "<builtin>":
-                continue
-            ignored.add(path)
+        match_path = relative.as_posix()
+        if is_dir:
+            match_path += "/"
+        if source.spec.match_file(match_path):
+            return True
 
-    return frozenset(ignored)
+    return False
