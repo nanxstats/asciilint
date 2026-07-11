@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+
+import pytest
 
 from asciilint.policy import CharacterPolicy
 from asciilint.scanner import (
@@ -23,13 +26,31 @@ def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
     assert not is_text_file(empty)
 
 
-def test_discover_files_batches_gitignore_and_custom_ignore(tmp_path: Path) -> None:
-    (tmp_path / ".gitignore").write_text("ignored-by-git/\n", encoding="utf-8")
-    (tmp_path / "custom.ignore").write_text("ignored-by-custom.txt\n", encoding="utf-8")
-    (tmp_path / "ignored-by-git").mkdir()
-    (tmp_path / "ignored-by-git" / "bad.txt").write_text("é", encoding="utf-8")
-    (tmp_path / "ignored-by-custom.txt").write_text("é", encoding="utf-8")
+def test_discover_files_prunes_gitignore_and_custom_ignore_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".gitignore").write_text(
+        "ignored-by-git/\nignored-file.txt\n", encoding="utf-8"
+    )
+    (tmp_path / "custom.ignore").write_text("ignored-by-custom/\n", encoding="utf-8")
+    ignored_directories = {
+        tmp_path / "ignored-by-git",
+        tmp_path / "ignored-by-custom",
+    }
+    for directory in ignored_directories:
+        directory.mkdir()
+        (directory / "nested").mkdir()
+        (directory / "nested" / "bad.txt").write_text("é", encoding="utf-8")
+    (tmp_path / "ignored-file.txt").write_text("é", encoding="utf-8")
     (tmp_path / "kept.txt").write_text("ok", encoding="utf-8")
+
+    real_scandir = os.scandir
+
+    def guarded_scandir(path: str | os.PathLike[str]):
+        assert Path(path) not in ignored_directories
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", guarded_scandir)
 
     discovery = discover_files(
         (tmp_path,),
@@ -43,7 +64,44 @@ def test_discover_files_batches_gitignore_and_custom_ignore(tmp_path: Path) -> N
         "custom.ignore",
         "kept.txt",
     }
-    assert discovery.ignored_count == 2
+    assert discovery.candidates_count == 4
+    assert discovery.ignored_count == 3
+
+
+def test_discover_files_respects_negated_directory_pattern(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".gitignore").write_text(
+        "generated/*\n!generated/keep/\n", encoding="utf-8"
+    )
+    ignored_directory = tmp_path / "generated" / "drop"
+    ignored_directory.mkdir(parents=True)
+    (ignored_directory / "bad.txt").write_text("é", encoding="utf-8")
+    kept_directory = tmp_path / "generated" / "keep"
+    kept_directory.mkdir()
+    (kept_directory / "good.txt").write_text("ok", encoding="utf-8")
+
+    real_scandir = os.scandir
+
+    def guarded_scandir(path: str | os.PathLike[str]):
+        assert Path(path) != ignored_directory
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", guarded_scandir)
+
+    discovery = discover_files(
+        (tmp_path,),
+        base_dir=tmp_path,
+        respect_gitignore=True,
+        ignore_files=(),
+    )
+
+    assert {path.relative_to(tmp_path).as_posix() for path in discovery.files} == {
+        ".gitignore",
+        "generated/keep/good.txt",
+    }
+    assert discovery.candidates_count == 2
+    assert discovery.ignored_count == 1
 
 
 def test_scan_text_file_reports_utf8_errors(tmp_path: Path) -> None:

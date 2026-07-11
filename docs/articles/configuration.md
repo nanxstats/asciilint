@@ -25,9 +25,19 @@ in TOML or passed on the command line:
 asciilint . --ignore-file .asciilintignore --ignore-file tools/asciilint.ignore
 ```
 
-Every ignore file must use gitignore syntax. Matching is handled by `pathspec`;
-`asciilint` applies loaded specs to discovered file paths in batches instead of
-checking each path against each pattern one by one.
+Every ignore file must use gitignore syntax. Matching is handled by `pathspec`.
+
+Directory entries are matched before `asciilint` descends into them, so the
+contents of ignored trees such as `.venv/` and `node_modules/` are never
+enumerated.
+
+Negated directory patterns are applied before that decision, so a
+rule such as `!generated/keep/` can keep a matching subtree in the scan.
+
+The discovery summary's "Files found" value counts file candidates only.
+Each pruned directory contributes one ignored entry, but not one file candidate.
+It does not count files under that directory because they are intentionally
+never queried.
 
 ## Character policy
 
@@ -59,7 +69,7 @@ disallowed_chars = ["é"]
 Allow any Unicode character except selected punctuation:
 
 ```bash
-asciilint . --allow-any --disallowed-char "→" --disallowed-range U+2000-U+206F
+asciilint . --allow-any --disallowed-char "&rarr;" --disallowed-range U+2000-U+206F
 ```
 
 ## UTF-8 only
