@@ -6,12 +6,13 @@
 
 - Refactored file discovery logic to load ignore rules before walking the
   filesystem and prune matching directories from `os.walk` (#12).
-
   Previously, `asciilint` enumerated every file before applying ignore rules,
   which caused noticeable startup lag in projects containing large ignored
   trees such as `.venv/` and `node_modules/`.
   Their contents are now never queried, while configured ignore files,
   negated directory rules, and `--no-gitignore` behavior remain supported.
+- Simplified discovery progress to report the files to scan and ignored entries
+  without a redundant "Files found" count (#14).
 
 ## asciilint 0.2.1
 

@@ -76,12 +76,7 @@ def format_scan_start(base_dir: Path) -> str:
 def format_discovery_progress(discovery: Discovery) -> str:
     """Format a discovery summary that is known before scanning starts."""
 
-    return (
-        "Files found: "
-        f"{discovery.candidates_count}, "
-        f"{len(discovery.files)} to scan, "
-        f"{discovery.ignored_count} ignored"
-    )
+    return f"Files to scan: {len(discovery.files)}, {discovery.ignored_count} ignored"
 
 
 def format_scan_totals(result: ScanResult) -> str:

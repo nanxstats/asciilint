@@ -34,10 +34,9 @@ enumerated.
 Negated directory patterns are applied before that decision, so a
 rule such as `!generated/keep/` can keep a matching subtree in the scan.
 
-The discovery summary's "Files found" value counts file candidates only.
-Each pruned directory contributes one ignored entry, but not one file candidate.
-It does not count files under that directory because they are intentionally
-never queried.
+The discovery summary's "Files to scan" value counts files after ignore
+filtering. Each pruned directory contributes one ignored entry. It does not
+count files under that directory because they are intentionally never queried.
 
 ## Character policy
 

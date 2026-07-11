@@ -40,7 +40,7 @@ def test_cli_respects_gitignore(tmp_path: Path) -> None:
     result = runner.invoke(main, ["--no-config", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "Files found: 2, 2 to scan, 1 ignored" in result.output
+    assert "Files to scan: 2, 1 ignored" in result.output
     assert "No issues :-)" in result.output
 
 
