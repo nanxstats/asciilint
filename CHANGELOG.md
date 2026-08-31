@@ -1,5 +1,28 @@
 # Changelog
 
+## asciilint (development version)
+
+### Improvements
+
+- Aligned binary file detection with the zlib C implementation of the
+  txtvsbin algorithm (#22). Bytes 26 (SUB) and 27 (ESC) are now gray-listed
+  (tolerated) instead of block-listed. This matches the mask in zlib's
+  `detect_data_type`. Files such as ANSI-colored logs that mix escape sequences
+  with regular text are now classified as text files and linted.
+  Files containing only gray-listed bytes remain binary files.
+- Bounded memory use when classifying files as text or binary (#22).
+  Classification now samples up to 8 KB from the head and 8 KB from the tail
+  of each file instead of reading the entire file, following the sampling
+  strategy used by zlib (first deflate block) and Google's Magika (head and
+  tail chunks). Files smaller than 16 KB are still read fully, so results for
+  typical repository files are unchanged. Larger files whose only binary
+  bytes sit between the sampled regions are now classified as text.
+- Streamed text scanning in fixed 64 KB character chunks instead of iterating
+  lines, bounding memory for large files without line breaks, and evaluated
+  the character policy once per distinct character per chunk instead of once
+  per character. This makes scans of large clean files orders of magnitude
+  faster (#22).
+
 ## asciilint 0.3.0
 
 ### Improvements
