@@ -20,10 +20,90 @@ def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
     binary.write_bytes(b"hello\x00world")
     empty = tmp_path / "empty.txt"
     empty.write_bytes(b"")
+    ansi_log = tmp_path / "colored.log"
+    ansi_log.write_bytes(b"\x1b[31merror\x1b[0m\n")
+    gray_only = tmp_path / "gray.bin"
+    gray_only.write_bytes(b"\x1a\x1b")
 
     assert is_text_file(text)
     assert not is_text_file(binary)
     assert not is_text_file(empty)
+    # SUB and ESC are gray-listed as in zlib's detect_data_type: tolerated
+    # alongside text, but not text on their own.
+    assert is_text_file(ansi_log)
+    assert not is_text_file(gray_only)
+
+
+def test_is_text_file_samples_head_and_tail_of_large_files(tmp_path: Path) -> None:
+    sample_size = 8
+
+    tail_binary = tmp_path / "tail.bin"
+    tail_binary.write_bytes(b"a" * 100 + b"\x00")
+    assert not is_text_file(tail_binary, sample_size=sample_size)
+
+    head_binary = tmp_path / "head.bin"
+    head_binary.write_bytes(b"\x00" + b"a" * 100)
+    assert not is_text_file(head_binary, sample_size=sample_size)
+
+    # A binary byte hidden between the sampled head and tail is not seen.
+    middle_binary = tmp_path / "middle.bin"
+    middle_binary.write_bytes(b"a" * 50 + b"\x00" + b"a" * 50)
+    assert is_text_file(middle_binary, sample_size=sample_size)
+
+    # Files up to twice the sample size are read fully.
+    small_middle_binary = tmp_path / "small-middle.bin"
+    small_middle_binary.write_bytes(b"a" * 7 + b"\x00" + b"a" * 8)
+    assert not is_text_file(small_middle_binary, sample_size=sample_size)
+
+
+def test_scan_text_file_positions_are_stable_across_chunks(tmp_path: Path) -> None:
+    path = tmp_path / "chunked.txt"
+    path.write_text("abc\né\nxyé\naaaaaé\n", encoding="utf-8")
+    policy = CharacterPolicy.from_config(
+        allowed_chars=(),
+        allowed_ranges=("U+0000-U+007F",),
+        disallowed_chars=(),
+        disallowed_ranges=(),
+    )
+
+    expected = [(2, 1), (3, 3), (4, 6)]
+    for chunk_size in (1, 2, 3, 4, 1024):
+        finding, error = scan_text_file(
+            path, policy=policy, max_issues_per_file=5, chunk_size=chunk_size
+        )
+
+        assert error is None
+        assert finding is not None
+        assert finding.total_issues == 3
+        assert [(issue.line, issue.column) for issue in finding.issues] == expected, (
+            f"chunk_size={chunk_size}"
+        )
+
+
+def test_scan_text_file_counts_issues_beyond_the_stored_limit(tmp_path: Path) -> None:
+    path = tmp_path / "many.txt"
+    path.write_text("é" * 10, encoding="utf-8")
+    policy = CharacterPolicy.from_config(
+        allowed_chars=(),
+        allowed_ranges=("U+0000-U+007F",),
+        disallowed_chars=(),
+        disallowed_ranges=(),
+    )
+
+    finding, error = scan_text_file(
+        path, policy=policy, max_issues_per_file=3, chunk_size=4
+    )
+
+    assert error is None
+    assert finding is not None
+    assert finding.total_issues == 10
+    assert len(finding.issues) == 3
+    assert finding.truncated
+    assert [(issue.line, issue.column) for issue in finding.issues] == [
+        (1, 1),
+        (1, 2),
+        (1, 3),
+    ]
 
 
 def test_discover_files_prunes_gitignore_and_custom_ignore_directories(

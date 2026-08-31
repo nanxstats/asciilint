@@ -11,9 +11,17 @@ from pathspec import PathSpec  # type: ignore[import-untyped]
 
 from asciilint.policy import CharacterPolicy
 
+# Matches the block mask in zlib's detect_data_type: 26 (SUB) and 27 (ESC)
+# are gray-listed, that is, tolerated but not treated as text on their own.
 TEXT_BYTES = frozenset({9, 10, 13, *range(32, 256)})
-BINARY_BYTES = frozenset({*range(0, 7), *range(14, 32)})
+BINARY_BYTES = frozenset({*range(0, 7), *range(14, 26), *range(28, 32)})
 BUILTIN_IGNORE_PATTERNS = (".git/", ".hg/", ".svn/")
+
+# Bytes sampled from each of the head and the tail when classifying a file,
+# so classification memory stays bounded for arbitrarily large files.
+TEXT_SAMPLE_SIZE = 8192
+# Decoded characters read per chunk when scanning a text file.
+SCAN_CHUNK_SIZE = 64 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,18 +118,29 @@ class ScanResult:
         return sum(finding.total_issues for finding in self.findings)
 
 
-def is_text_file(path: Path, *, bytes_to_read: int | None = None) -> bool:
-    """Classify a file as text or binary with the zlib txtvsbin algorithm."""
+def is_text_file(path: Path, *, sample_size: int = TEXT_SAMPLE_SIZE) -> bool:
+    """Classify a file as text or binary with the zlib txtvsbin algorithm.
+
+    Files up to ``2 * sample_size`` bytes are read fully. Larger files are
+    sampled: ``sample_size`` bytes from the head and from the tail, so
+    classification cost is bounded regardless of file size.
+    """
 
     with path.open("rb") as file:
-        data = file.read() if bytes_to_read is None else file.read(bytes_to_read)
+        size = file.seek(0, os.SEEK_END)
+        file.seek(0)
+        if size <= 2 * sample_size:
+            data = file.read(size)
+        else:
+            head = file.read(sample_size)
+            file.seek(size - sample_size)
+            data = head + file.read(sample_size)
 
     if not data:
         return False
 
-    has_text_byte = any(byte in TEXT_BYTES for byte in data)
-    has_binary_byte = any(byte in BINARY_BYTES for byte in data)
-    return has_text_byte and not has_binary_byte
+    present = frozenset(data)
+    return not present.isdisjoint(TEXT_BYTES) and present.isdisjoint(BINARY_BYTES)
 
 
 def discover_files(
@@ -220,29 +239,60 @@ def scan(
 
 
 def scan_text_file(
-    path: Path, *, policy: CharacterPolicy, max_issues_per_file: int
+    path: Path,
+    *,
+    policy: CharacterPolicy,
+    max_issues_per_file: int,
+    chunk_size: int = SCAN_CHUNK_SIZE,
 ) -> tuple[FileFinding | None, FileError | None]:
-    """Scan one UTF-8 text file for policy violations."""
+    """Scan one UTF-8 text file for policy violations.
+
+    The file is streamed in chunks of ``chunk_size`` decoded characters, so
+    memory stays bounded even for large files without line breaks. The policy
+    is evaluated once per distinct character in a chunk; chunks made entirely
+    of allowed characters skip the per-character position tracking.
+    """
 
     issues: list[CharacterIssue] = []
     total_issues = 0
+    line_number = 1
+    column = 1
+    allowed: dict[str, bool] = {}
 
     try:
         with path.open("r", encoding="utf-8") as file:
-            for line_number, line in enumerate(file, start=1):
-                for column, char in enumerate(line, start=1):
-                    if policy.is_allowed(char):
-                        continue
-                    total_issues += 1
-                    if len(issues) < max_issues_per_file:
-                        issues.append(
-                            CharacterIssue(
-                                line=line_number,
-                                column=column,
-                                char=char,
-                                reason=policy.violation_reason(char),
+            while chunk := file.read(chunk_size):
+                distinct = frozenset(chunk)
+                for char in distinct:
+                    if char not in allowed:
+                        allowed[char] = policy.is_allowed(char)
+
+                if all(allowed[char] for char in distinct):
+                    newlines = chunk.count("\n")
+                    if newlines:
+                        line_number += newlines
+                        column = len(chunk) - chunk.rindex("\n")
+                    else:
+                        column += len(chunk)
+                    continue
+
+                for char in chunk:
+                    if not allowed[char]:
+                        total_issues += 1
+                        if len(issues) < max_issues_per_file:
+                            issues.append(
+                                CharacterIssue(
+                                    line=line_number,
+                                    column=column,
+                                    char=char,
+                                    reason=policy.violation_reason(char),
+                                )
                             )
-                        )
+                    if char == "\n":
+                        line_number += 1
+                        column = 1
+                    else:
+                        column += 1
     except UnicodeDecodeError as exc:
         return None, FileError(
             path=path,
