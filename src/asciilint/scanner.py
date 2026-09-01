@@ -15,6 +15,13 @@ from asciilint.policy import CharacterPolicy
 # are gray-listed, that is, tolerated but not treated as text on their own.
 TEXT_BYTES = frozenset({9, 10, 13, *range(32, 256)})
 BINARY_BYTES = frozenset({*range(0, 7), *range(14, 26), *range(28, 32)})
+# Magic numbers of known binary formats that can defeat the txtvsbin heuristic
+BINARY_SIGNATURES = (
+    # PDF header, required as the first line by ISO 32000-1 section 7.5.2.
+    b"%PDF-",
+    # DOS EPS binary file header (EPS with a TIFF/WMF preview).
+    b"\xc5\xd0\xd3\xc6",
+)
 BUILTIN_IGNORE_PATTERNS = (".git/", ".hg/", ".svn/")
 
 # Bytes sampled from each of the head and the tail when classifying a file,
@@ -121,6 +128,10 @@ class ScanResult:
 def is_text_file(path: Path, *, sample_size: int = TEXT_SAMPLE_SIZE) -> bool:
     """Classify a file as text or binary with the zlib txtvsbin algorithm.
 
+    Files starting with a known binary format signature (``BINARY_SIGNATURES``)
+    are classified as binary before the byte-set check, since such formats can
+    consist entirely of allow-listed bytes.
+
     Files up to ``2 * sample_size`` bytes are read fully. Larger files are
     sampled: ``sample_size`` bytes from the head and from the tail, so
     classification cost is bounded regardless of file size.
@@ -137,6 +148,9 @@ def is_text_file(path: Path, *, sample_size: int = TEXT_SAMPLE_SIZE) -> bool:
             data = head + file.read(sample_size)
 
     if not data:
+        return False
+
+    if data.startswith(BINARY_SIGNATURES):
         return False
 
     present = frozenset(data)

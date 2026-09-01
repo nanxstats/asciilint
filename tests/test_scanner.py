@@ -34,6 +34,28 @@ def test_is_text_file_uses_zlib_algorithm(tmp_path: Path) -> None:
     assert not is_text_file(gray_only)
 
 
+def test_is_text_file_detects_binary_signatures(tmp_path: Path) -> None:
+    # Uncompressed PDFs (for example, written by R's pdf() device) can contain
+    # only allow-listed bytes, so txtvsbin alone would classify them as text.
+    pdf = tmp_path / "figure.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%\x81\xe2\x81\xe3\x81\xcf\x81\xd3\\r\n1 0 obj\n")
+    assert not is_text_file(pdf)
+
+    # The signature applies regardless of file extension.
+    renamed_pdf = tmp_path / "figure"
+    renamed_pdf.write_bytes(b"%PDF-1.4\nplain ascii body\n")
+    assert not is_text_file(renamed_pdf)
+
+    dos_eps = tmp_path / "figure.eps"
+    dos_eps.write_bytes(b"\xc5\xd0\xd3\xc6" + b"preview bytes")
+    assert not is_text_file(dos_eps)
+
+    # The signature only matches at offset 0, not later in the file.
+    mentions_pdf = tmp_path / "notes.txt"
+    mentions_pdf.write_text("PDF files start with %PDF-1.4\n", encoding="utf-8")
+    assert is_text_file(mentions_pdf)
+
+
 def test_is_text_file_samples_head_and_tail_of_large_files(tmp_path: Path) -> None:
     sample_size = 8
 
