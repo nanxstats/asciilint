@@ -98,7 +98,9 @@ asciilint . --allow-any --disallowed-char "→" --disallowed-range U+2000-U+206F
 
 `asciilint` assumes text files are UTF-8. Files that are classified as text but
 cannot be decoded as UTF-8 are reported explicitly and skipped. Binary files are
-skipped automatically using the zlib `txtvsbin` heuristic.
+skipped automatically using the zlib `txtvsbin` heuristic, plus a short list of
+known binary format signatures for formats that the byte-level heuristic
+alone cannot catch.
 
 Both steps use bounded memory regardless of file size.
 The classification step samples up to 8 KB from the head and
