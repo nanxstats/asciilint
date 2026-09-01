@@ -6,7 +6,7 @@
 
 - Files starting with a known binary format signature are now correctly
   classified as binary before the txtvsbin byte set check runs (#23).
-  This covers formats whose content can contain entirely of allow-listed bytes:
+  This covers formats whose content can consist entirely of allow-listed bytes:
   PDF files (for example, uncompressed PDFs written by R's `pdf()` device)
   and DOS EPS binary files (EPS with a TIFF/WMF preview).
   Previously, such files were classified as text files and then reported as
