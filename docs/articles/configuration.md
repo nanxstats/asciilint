@@ -68,7 +68,7 @@ disallowed_chars = ["é"]
 Allow any Unicode character except selected punctuation:
 
 ```bash
-asciilint . --allow-any --disallowed-char "&rarr;" --disallowed-range U+2000-U+206F
+asciilint . --allow-any --disallowed-char "→" --disallowed-range U+2000-U+206F
 ```
 
 ## UTF-8 only
