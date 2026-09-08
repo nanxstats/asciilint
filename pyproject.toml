@@ -1,6 +1,6 @@
 [project]
 name = "asciilint"
-version = "0.4.0"
+version = "0.4.1"
 description = "ASCII and character policy checks for text files"
 authors = [{ name = "Nan Xiao", email = "me@nanx.me" }]
 readme = "README.md"
@@ -43,8 +43,20 @@ requires = ["uv_build>=0.12.10,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-source-exclude = ["/docs", "/scripts", "/AGENTS.md", "/uv.lock", "/zensical.toml"]
-wheel-exclude = ["/docs", "/scripts", "/AGENTS.md", "/uv.lock", "/zensical.toml"]
+source-exclude = [
+    "/docs",
+    "/scripts",
+    "/AGENTS.md",
+    "/uv.lock",
+    "/zensical.toml",
+]
+wheel-exclude = [
+    "/docs",
+    "/scripts",
+    "/AGENTS.md",
+    "/uv.lock",
+    "/zensical.toml",
+]
 
 [dependency-groups]
 dev = [
