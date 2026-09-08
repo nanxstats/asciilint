@@ -1,6 +1,6 @@
 # Changelog
 
-## asciilint (development version)
+## asciilint 0.4.1
 
 ### Maintenance
 
